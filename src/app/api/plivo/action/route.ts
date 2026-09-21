@@ -91,7 +91,7 @@ export async function POST(req: NextRequest) {
 
       return new NextResponse(xml, {
         status: 200,
-        headers: { "Content-Type": "application/xml; charset=utf-8" },
+        headers: { "Content-Type": "text/xml; charset=utf-8" },
       });
     }
 
@@ -183,7 +183,7 @@ export async function POST(req: NextRequest) {
       });
       return new NextResponse(farewellXml, {
         status: 200,
-        headers: { "Content-Type": "application/xml; charset=utf-8" },
+        headers: { "Content-Type": "text/xml; charset=utf-8" },
       });
     }
 
@@ -200,14 +200,14 @@ export async function POST(req: NextRequest) {
 
     return new NextResponse(xml, {
       status: 200,
-      headers: { "Content-Type": "application/xml; charset=utf-8" },
+      headers: { "Content-Type": "text/xml; charset=utf-8" },
     });
   } catch (error) {
     console.error("[Plivo Action Error]:", error);
     const errorXml = buildErrorXml();
     return new NextResponse(errorXml, {
       status: 200,
-      headers: { "Content-Type": "application/xml; charset=utf-8" },
+      headers: { "Content-Type": "text/xml; charset=utf-8" },
     });
   }
 }

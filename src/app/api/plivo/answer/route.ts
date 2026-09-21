@@ -78,7 +78,7 @@ async function handleAnswer(req: NextRequest) {
     return new NextResponse(xml, {
       status: 200,
       headers: {
-        "Content-Type": "application/xml; charset=utf-8",
+        "Content-Type": "text/xml; charset=utf-8",
       },
     });
   } catch (error) {
@@ -87,7 +87,7 @@ async function handleAnswer(req: NextRequest) {
     return new NextResponse(errorXml, {
       status: 200,
       headers: {
-        "Content-Type": "application/xml; charset=utf-8",
+        "Content-Type": "text/xml; charset=utf-8",
       },
     });
   }

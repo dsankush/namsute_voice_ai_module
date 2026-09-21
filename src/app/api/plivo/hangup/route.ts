@@ -34,7 +34,7 @@ export async function POST(req: NextRequest) {
 
     return new NextResponse("<?xml version=\"1.0\" encoding=\"UTF-8\"?><Response></Response>", {
       status: 200,
-      headers: { "Content-Type": "application/xml; charset=utf-8" },
+      headers: { "Content-Type": "text/xml; charset=utf-8" },
     });
   } catch (err) {
     console.warn("[Plivo Hangup Error]:", err);

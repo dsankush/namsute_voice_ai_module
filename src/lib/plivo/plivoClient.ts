@@ -9,10 +9,12 @@ export function getPlivoConfig(): PlivoConfig | null {
   const authId = process.env.PLIVO_AUTH_ID?.trim();
   const authToken = process.env.PLIVO_AUTH_TOKEN?.trim();
   const phoneNumber = process.env.PLIVO_PHONE_NUMBER?.trim() || "";
+  // Explicitly avoid process.env.VERCEL_URL because Vercel preview domains
+  // have Vercel SSO/Deployment Protection enabled (which returns HTTP 302 Redirect to login).
+  // Always use NEXT_PUBLIC_APP_URL or fallback to the public production domain.
   const appUrl = (
     process.env.NEXT_PUBLIC_APP_URL ||
     process.env.APP_URL ||
-    (process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : "") ||
     "https://namsute-voice-ai-module.vercel.app"
   ).replace(/\/+$/, "");
 
