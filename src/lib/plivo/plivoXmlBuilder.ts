@@ -29,6 +29,20 @@ function escapeXml(unsafe: string): string {
   });
 }
 
+/**
+ * Constructs a stateless streaming media URL that generates Sarvam neural audio on demand.
+ */
+export function getSarvamMediaUrl(
+  appUrl: string,
+  text: string,
+  speaker = "ritu",
+  lang = "en-IN",
+  tone = "neutral"
+): string {
+  const base64Text = Buffer.from(text.trim()).toString("base64url");
+  return `${appUrl}/api/plivo/media?t=${base64Text}&s=${encodeURIComponent(speaker)}&l=${encodeURIComponent(lang)}&tone=${encodeURIComponent(tone)}`;
+}
+
 function getPollyVoice(language: string): string {
   if (language === "hi-IN") return "Polly.Aditi";
   if (language.startsWith("en")) return "Polly.Aditi";
@@ -36,7 +50,7 @@ function getPollyVoice(language: string): string {
 }
 
 /**
- * Builds Plivo XML that plays the AI response (via native carrier Polly TTS or <Play>)
+ * Builds Plivo XML that plays the AI response (using Sarvam AI neural audio via <Play>)
  * and captures caller speech via <GetInput inputType="speech">.
  */
 export function buildSpeechPromptXml(params: BuildSpeechPromptXmlParams): string {
@@ -54,17 +68,22 @@ export function buildSpeechPromptXml(params: BuildSpeechPromptXmlParams): string
   const validExec = Math.max(5, Math.min(60, executionTimeout));
   const voice = getPollyVoice(language);
 
-  // Use native Plivo Polly TTS directly for carrier-grade stability
+  // Play high-fidelity Sarvam AI audio via <Play>, falling back to native Polly TTS
   const playbackElement = audioUrl
     ? `<Play>${escapeXml(audioUrl)}</Play>`
     : `<Speak voice="${voice}" language="${escapeXml(language)}">${escapeXml(fallbackText)}</Speak>`;
+
+  // Localized no-input fallback so Polly never fails on language mismatch
+  const noInputText = language === "hi-IN"
+    ? "मुझे कोई आवाज़ नहीं सुनाई दी। कृपया दोबारा बोलें।"
+    : "I did not hear any response. Could you please say that again?";
 
   return `<?xml version="1.0" encoding="UTF-8"?>
 <Response>
   <GetInput action="${escapeXml(actionUrl)}" method="POST" inputType="speech" executionTimeout="${validExec}" speechEndTimeout="${validSpeechEnd}" language="${escapeXml(language)}">
     ${playbackElement}
   </GetInput>
-  <Speak voice="${voice}" language="${escapeXml(language)}">I did not hear any response. Could you please say that again?</Speak>
+  <Speak voice="${voice}" language="${escapeXml(language)}">${escapeXml(noInputText)}</Speak>
   <GetInput action="${escapeXml(actionUrl)}" method="POST" inputType="speech" executionTimeout="10" speechEndTimeout="${validSpeechEnd}" language="${escapeXml(language)}"/>
 </Response>`.trim();
 }

@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getPlivoConfig } from "@/lib/plivo/plivoClient";
 import { getOrCreatePlivoSession, encodeStatelessToken } from "@/lib/plivo/plivoSessionStore";
-import { buildSpeechPromptXml, buildErrorXml } from "@/lib/plivo/plivoXmlBuilder";
+import { buildSpeechPromptXml, buildErrorXml, getSarvamMediaUrl } from "@/lib/plivo/plivoXmlBuilder";
 import { AUTOMOBILE_TEMPLATES } from "@/automobile/automobileTemplates";
 import { CLINIC_TEMPLATES } from "@/data/clinicTemplates";
 
@@ -66,8 +66,11 @@ async function handleAnswer(req: NextRequest) {
     const token = encodeStatelessToken(session);
     const actionUrl = `${appUrl}/api/plivo/action?callUuid=${encodeURIComponent(callUuid)}&token=${encodeURIComponent(token)}`;
 
-    // Deliver instant carrier-grade Polly TTS prompt XML without 404 media risks
+    // Generate Sarvam AI neural audio URL for natural Indian voice greeting
+    const audioUrl = getSarvamMediaUrl(appUrl, greetingText, speaker, "en-IN", "greeting");
+
     const xml = buildSpeechPromptXml({
+      audioUrl,
       fallbackText: greetingText,
       actionUrl,
       speechEndTimeout: 2,

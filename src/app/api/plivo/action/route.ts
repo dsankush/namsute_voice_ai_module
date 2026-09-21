@@ -6,7 +6,7 @@ import {
   decodeStatelessToken,
   encodeStatelessToken,
 } from "@/lib/plivo/plivoSessionStore";
-import { buildSpeechPromptXml, buildFarewellXml, buildErrorXml } from "@/lib/plivo/plivoXmlBuilder";
+import { buildSpeechPromptXml, buildFarewellXml, buildErrorXml, getSarvamMediaUrl } from "@/lib/plivo/plivoXmlBuilder";
 import { processChatTurn } from "@/app/api/ai-demo/chat/route";
 import { transcribeSpeech } from "@/app/api/ai-demo/speech/route";
 import { buildAutomobileWebhookPayload } from "@/automobile/automobileWebhook";
@@ -80,8 +80,10 @@ export async function POST(req: NextRequest) {
 
       const nextToken = encodeStatelessToken(session);
       const actionUrl = `${appUrl}/api/plivo/action?callUuid=${encodeURIComponent(callUuid)}&token=${encodeURIComponent(nextToken)}`;
+      const retryAudioUrl = getSarvamMediaUrl(appUrl, retryText, session.speaker, "en-IN");
 
       const xml = buildSpeechPromptXml({
+        audioUrl: retryAudioUrl,
         fallbackText: retryText,
         actionUrl,
         speechEndTimeout: 2,
@@ -177,7 +179,9 @@ export async function POST(req: NextRequest) {
 
     // 7. Shape Plivo XML Response
     if (isFinished) {
+      const farewellAudioUrl = getSarvamMediaUrl(appUrl, finalReply, session.speaker, finalLangCode, "confirmed");
       const farewellXml = buildFarewellXml({
+        audioUrl: farewellAudioUrl,
         farewellText: finalReply,
         language: plivoLang,
       });
@@ -189,8 +193,10 @@ export async function POST(req: NextRequest) {
 
     const nextToken = encodeStatelessToken(session);
     const actionUrl = `${appUrl}/api/plivo/action?callUuid=${encodeURIComponent(callUuid)}&token=${encodeURIComponent(nextToken)}`;
+    const replyAudioUrl = getSarvamMediaUrl(appUrl, speechText, session.speaker, finalLangCode, toneHint);
 
     const xml = buildSpeechPromptXml({
+      audioUrl: replyAudioUrl,
       fallbackText: speechText,
       actionUrl,
       speechEndTimeout: 2,
