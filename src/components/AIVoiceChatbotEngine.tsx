@@ -514,7 +514,18 @@ export default function AIVoiceChatbotEngine({
 }: AIVoiceChatbotEngineProps = {}) {
   const effectiveIndustry = lockedIndustryId || initialIndustryId || "doctors-clinics";
   const [selectedIndustryId, setSelectedIndustryId] = useState<string>(effectiveIndustry);
-  const [channel, setChannel] = useState<"voice" | "chat">("voice");
+  const [channel, setChannel] = useState<"voice" | "chat" | "phone">("voice");
+
+  // Plivo Telephony Calling States
+  const [plivoPhoneInput, setPlivoPhoneInput] = useState<string>("");
+  const [plivoCalling, setPlivoCalling] = useState<boolean>(false);
+  const [plivoCallStatus, setPlivoCallStatus] = useState<string>("");
+  const [plivoCallSuccess, setPlivoCallSuccess] = useState<boolean | null>(null);
+  const [plivoConfigInfo, setPlivoConfigInfo] = useState<{
+    configured: boolean;
+    phoneNumber?: string;
+    inboundAnswerUrl?: string;
+  } | null>(null);
 
   // Call & Audio states
   const [isCallActive, setIsCallActive] = useState<boolean>(false);
@@ -677,6 +688,51 @@ export default function AIVoiceChatbotEngine({
       chatBottomRef.current.scrollIntoView({ behavior: "smooth" });
     }
   }, [conversationHistory, channel]);
+
+  useEffect(() => {
+    fetch("/api/plivo/status")
+      .then((res) => res.json())
+      .then((data) => setPlivoConfigInfo(data))
+      .catch(() => {});
+  }, []);
+
+  const handleTriggerPlivoCall = async () => {
+    if (!plivoPhoneInput || plivoPhoneInput.trim().replace(/\D/g, "").length < 10) {
+      setPlivoCallStatus("Please enter a valid 10-digit mobile number.");
+      setPlivoCallSuccess(false);
+      return;
+    }
+
+    setPlivoCalling(true);
+    setPlivoCallStatus("Connecting to Plivo Telecom Network...");
+    setPlivoCallSuccess(null);
+
+    try {
+      const res = await fetch("/api/plivo/outbound", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          phoneNumber: plivoPhoneInput.trim(),
+          industryId: selectedIndustryId,
+          speaker: selectedSpeaker || "ritu",
+        }),
+      });
+
+      const data = await res.json();
+      if (!res.ok) {
+        setPlivoCallStatus(data.error || "Failed to trigger phone call.");
+        setPlivoCallSuccess(false);
+      } else {
+        setPlivoCallStatus("Call initiated! Your mobile phone will ring in a few moments. Answer to begin talking with the AI.");
+        setPlivoCallSuccess(true);
+      }
+    } catch {
+      setPlivoCallStatus("Network error connecting to telephony service.");
+      setPlivoCallSuccess(false);
+    } finally {
+      setPlivoCalling(false);
+    }
+  };
 
   const stopCurrentAudio = useCallback(() => {
     if (currentAudioRef.current) {
@@ -1914,7 +1970,7 @@ export default function AIVoiceChatbotEngine({
               navigation and proper tab semantics for free, styled to keep
               the exact solid-lime "pill" look the rest of the console uses. */}
           <div className="header-action-controls" style={{ display: "flex", alignItems: "center", gap: "8px", flexShrink: 0 }}>
-            <Tabs value={channel} onValueChange={(v) => setChannel(v as "voice" | "chat")}>
+            <Tabs value={channel} onValueChange={(v) => setChannel(v as "voice" | "chat" | "phone")}>
               <TabsList
                 variant="line"
                 className="!h-auto !gap-0 !rounded-full !border !border-white/10 !bg-black/40 !p-[2px]"
@@ -1932,6 +1988,13 @@ export default function AIVoiceChatbotEngine({
                 >
                   <MessageSquare size={11} />
                   <span>Chat</span>
+                </TabsTrigger>
+                <TabsTrigger
+                  value="phone"
+                  className="!rounded-full !border-0 !px-3 !py-[5px] !text-[11px] !font-semibold !text-[#A1A1AA] data-active:!bg-[#38BDF8] data-active:!text-black data-active:after:!opacity-0"
+                >
+                  <Radio size={11} />
+                  <span>Phone Call</span>
                 </TabsTrigger>
               </TabsList>
             </Tabs>
@@ -2753,7 +2816,7 @@ export default function AIVoiceChatbotEngine({
                 )}
               </div>
             </div>
-          ) : (
+          ) : channel === "chat" ? (
             /* CHATBOT CHANNEL INTERFACE */
             <div style={{ display: "flex", flexDirection: "column", height: "100%", justifyContent: "space-between" }}>
               {dataBadgesLayer}
@@ -2921,6 +2984,146 @@ export default function AIVoiceChatbotEngine({
                   <Send size={15} />
                 </button>
               </form>
+            </div>
+          ) : (
+            <div
+              style={{
+                display: "flex",
+                flexDirection: "column",
+                alignItems: "center",
+                justifyContent: "center",
+                width: "100%",
+                maxWidth: "600px",
+                margin: "0 auto",
+                padding: "24px 20px",
+                background: "radial-gradient(ellipse at top, rgba(56, 189, 248, 0.08), transparent 70%), rgba(20, 20, 24, 0.6)",
+                border: "1px solid rgba(56, 189, 248, 0.2)",
+                borderRadius: "20px",
+                boxSizing: "border-box",
+                gap: "18px",
+                textAlign: "center",
+              }}
+            >
+              {/* Telephony Header & Badges */}
+              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", width: "100%", flexWrap: "wrap", gap: "8px" }}>
+                <div style={{ display: "inline-flex", alignItems: "center", gap: "6px", background: "rgba(56, 189, 248, 0.12)", border: "1px solid rgba(56, 189, 248, 0.3)", borderRadius: "999px", padding: "4px 10px", fontSize: "11px", fontWeight: 600, color: "#38BDF8" }}>
+                  <Radio size={12} />
+                  <span>Plivo Cellular Telephony Network</span>
+                </div>
+                <div style={{ fontSize: "11px", fontWeight: 500, color: plivoConfigInfo?.configured ? "#4ADE80" : "#FBBF24", display: "inline-flex", alignItems: "center", gap: "5px" }}>
+                  <span style={{ width: "6px", height: "6px", borderRadius: "50%", background: plivoConfigInfo?.configured ? "#4ADE80" : "#FBBF24" }} />
+                  <span>{plivoConfigInfo?.configured ? "Plivo Online" : "Telephony Gateway Ready"}</span>
+                </div>
+              </div>
+
+              {/* Title & Description */}
+              <div style={{ display: "flex", flexDirection: "column", gap: "6px" }}>
+                <h3 style={{ margin: 0, fontSize: "20px", fontWeight: 700, color: "#F5F5F0", letterSpacing: "-0.02em" }}>
+                  Test on Your Mobile Phone
+                </h3>
+                <p style={{ margin: 0, fontSize: "12.5px", color: "#A1A1AA", lineHeight: 1.5 }}>
+                  Experience <strong style={{ color: "#F5F5F0" }}>{activeIndustry.brandName}</strong> directly on a real phone call over standard cellular telephony. Enter your number below and your phone will ring immediately.
+                </p>
+              </div>
+
+              {/* Dialer Input Card */}
+              <div style={{ width: "100%", display: "flex", flexDirection: "column", gap: "10px", background: "rgba(0,0,0,0.3)", padding: "16px", borderRadius: "14px", border: "1px solid rgba(255,255,255,0.06)" }}>
+                <label style={{ fontSize: "11.5px", fontWeight: 600, color: "#D4D0C7", textAlign: "left", display: "block" }}>
+                  Enter Mobile Number to Call:
+                </label>
+                <div style={{ display: "flex", gap: "8px", width: "100%" }}>
+                  <div style={{ padding: "12px 14px", background: "rgba(255, 255, 255, 0.04)", border: "1px solid rgba(255, 255, 255, 0.12)", borderRadius: "12px", color: "#38BDF8", fontSize: "13px", fontWeight: 700, display: "flex", alignItems: "center", gap: "4px" }}>
+                    <span>🇮🇳</span>
+                    <span>+91</span>
+                  </div>
+                  <input
+                    type="tel"
+                    value={plivoPhoneInput}
+                    onChange={(e) => setPlivoPhoneInput(e.target.value)}
+                    placeholder="98765 43210"
+                    maxLength={15}
+                    style={{
+                      flex: 1,
+                      padding: "12px 16px",
+                      borderRadius: "12px",
+                      background: "rgba(0, 0, 0, 0.6)",
+                      border: "1px solid rgba(56, 189, 248, 0.3)",
+                      color: "#F5F5F0",
+                      fontSize: "14px",
+                      letterSpacing: "0.05em",
+                      outline: "none",
+                      fontFamily: "monospace",
+                    }}
+                  />
+                </div>
+
+                {/* Call My Phone Button */}
+                <button
+                  type="button"
+                  onClick={handleTriggerPlivoCall}
+                  disabled={plivoCalling || !plivoPhoneInput.trim()}
+                  style={{
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    gap: "8px",
+                    width: "100%",
+                    padding: "13px 20px",
+                    borderRadius: "12px",
+                    background: plivoCalling ? "rgba(56, 189, 248, 0.3)" : "linear-gradient(135deg, #38BDF8 0%, #0284C7 100%)",
+                    color: "#FFFFFF",
+                    border: "none",
+                    fontSize: "13px",
+                    fontWeight: 700,
+                    cursor: plivoCalling ? "not-allowed" : "pointer",
+                    boxShadow: "0 4px 16px rgba(56, 189, 248, 0.3)",
+                    transition: "all 0.2s ease",
+                  }}
+                >
+                  <Phone size={15} />
+                  <span>{plivoCalling ? "Dialing Your Phone..." : "Call My Phone Now"}</span>
+                </button>
+              </div>
+
+              {/* Status Banner */}
+              {plivoCallStatus && (
+                <div
+                  style={{
+                    width: "100%",
+                    padding: "10px 14px",
+                    borderRadius: "10px",
+                    fontSize: "12px",
+                    lineHeight: 1.45,
+                    textAlign: "left",
+                    background: plivoCallSuccess ? "rgba(34, 197, 94, 0.12)" : plivoCallSuccess === false ? "rgba(239, 68, 68, 0.12)" : "rgba(56, 189, 248, 0.12)",
+                    border: `1px solid ${plivoCallSuccess ? "rgba(34, 197, 94, 0.3)" : plivoCallSuccess === false ? "rgba(239, 68, 68, 0.3)" : "rgba(56, 189, 248, 0.3)"}`,
+                    color: plivoCallSuccess ? "#4ADE80" : plivoCallSuccess === false ? "#F87171" : "#38BDF8",
+                  }}
+                >
+                  {plivoCallStatus}
+                </div>
+              )}
+
+              {/* Inbound Calling / Number Direct Info */}
+              <div style={{ display: "flex", flexDirection: "column", gap: "6px", width: "100%", background: "rgba(255,255,255,0.02)", border: "1px solid rgba(255,255,255,0.06)", borderRadius: "12px", padding: "12px 14px", textAlign: "left" }}>
+                <span style={{ fontSize: "11px", fontWeight: 600, color: "#8E8E93", textTransform: "uppercase", letterSpacing: "0.04em" }}>
+                  Inbound Virtual Line
+                </span>
+                <p style={{ margin: 0, fontSize: "11.5px", color: "#A1A1AA", lineHeight: 1.45 }}>
+                  {plivoConfigInfo?.phoneNumber ? (
+                    <>
+                      Assigned Plivo Number: <strong style={{ color: "#38BDF8" }}>{plivoConfigInfo.phoneNumber}</strong>. You can call this number directly from any standard mobile phone.
+                    </>
+                  ) : (
+                    <>
+                      Plivo Answer URL for your Plivo Phone Number:
+                      <code style={{ display: "block", marginTop: "4px", padding: "4px 8px", background: "rgba(0,0,0,0.5)", borderRadius: "6px", color: "#67E8F9", fontSize: "10.5px" }}>
+                        https://namsute-voice-ai-module.vercel.app/api/plivo/answer
+                      </code>
+                    </>
+                  )}
+                </p>
+              </div>
             </div>
           )}
 

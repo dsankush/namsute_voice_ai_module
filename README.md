@@ -39,8 +39,30 @@ Configure these environment variables in your Vercel Project Settings (`Settings
 | `OPENAI_API_KEY` | OpenAI API Key (used for GPT-4o-mini conversation & entity extraction) | **Yes** |
 | `SARVAM_API_KEY` | Sarvam AI API Key (used for speech-to-text transcription and text-to-speech synthesis) | **Yes** |
 | `GEMINI_API_KEY` | Google Gemini API Key (failover LLM if OpenAI is unavailable or rate-limited) | Optional |
+| `PLIVO_AUTH_ID` | Plivo Auth ID for telephony calls | For Phone Calling |
+| `PLIVO_AUTH_TOKEN` | Plivo Auth Token for telephony calls | For Phone Calling |
+| `PLIVO_PHONE_NUMBER` | Plivo DID Virtual Phone Number (E.164, e.g. `+912264233245`) | For Phone Calling |
+| `NEXT_PUBLIC_APP_URL` | Public deployment URL (e.g. `https://namsute-voice-ai-module.vercel.app`) | For Phone Calling |
 | `AUTOMOBILE_WEBHOOK_URL` | Destination webhook endpoint for Automobile Service & Test Drive bookings | Optional |
 | `AI_DEMO_WEBHOOK_URL` | General CRM / automation webhook endpoint for lead captures | Optional |
+
+---
+
+## 📞 Plivo Telephony Setup (Cellular Inbound & Outbound Calling)
+
+The platform supports direct cellular phone calls via Plivo:
+
+1. **Outbound "Call My Phone" Demo**:
+   Users can switch to the **Phone Call** tab in the UI, enter their mobile number (e.g. `+919876543210`), and receive an automated call from the AI Agent (`Apex Motors` or `Sunshine Clinic`).
+
+2. **Inbound Direct Dialing**:
+   Callers dial your Plivo DID number directly. Configure this in your **Plivo Console**:
+   - Go to **Phone Numbers** → **Your Number** (e.g., `+912264233245`).
+   - Set **Answer URL** to: `https://namsute-voice-ai-module.vercel.app/api/plivo/answer`
+   - Set **Method** to: `POST`
+   - Set **Hangup URL** to: `https://namsute-voice-ai-module.vercel.app/api/plivo/hangup` (Method: `POST`)
+   - Click **Update**.
+
 
 ---
 
