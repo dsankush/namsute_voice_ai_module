@@ -7,9 +7,8 @@ import {
   encodeStatelessToken,
 } from "@/lib/plivo/plivoSessionStore";
 import { buildSpeechPromptXml, buildFarewellXml, buildErrorXml } from "@/lib/plivo/plivoXmlBuilder";
-import { savePlivoMedia } from "@/lib/plivo/plivoMediaStore";
 import { processChatTurn } from "@/app/api/ai-demo/chat/route";
-import { generateSarvamTTS, transcribeSpeech } from "@/app/api/ai-demo/speech/route";
+import { transcribeSpeech } from "@/app/api/ai-demo/speech/route";
 import { buildAutomobileWebhookPayload } from "@/automobile/automobileWebhook";
 
 async function parsePlivoActionParams(req: NextRequest) {
@@ -79,18 +78,14 @@ export async function POST(req: NextRequest) {
           ? "I didn't quite hear you. How can Apex Motors assist you today?"
           : "I'm sorry, I couldn't hear that clearly. Could you please repeat?";
 
-      const tts = await generateSarvamTTS(retryText, session.speaker, "en-IN", "neutral").catch(() => ({ audioBase64: null }));
-      const audioUrl = tts.audioBase64
-        ? `${appUrl}/api/plivo/media?id=${savePlivoMedia(tts.audioBase64)}`
-        : undefined;
-
       const nextToken = encodeStatelessToken(session);
       const actionUrl = `${appUrl}/api/plivo/action?callUuid=${encodeURIComponent(callUuid)}&token=${encodeURIComponent(nextToken)}`;
 
       const xml = buildSpeechPromptXml({
-        audioUrl,
         fallbackText: retryText,
         actionUrl,
+        speechEndTimeout: 2,
+        executionTimeout: 15,
         language: "en-IN",
       });
 
@@ -134,18 +129,9 @@ export async function POST(req: NextRequest) {
     session.lastSpokenText = finalSpokenText || finalReply;
     session.isComplete = finalIsComplete;
 
-    // 5. Generate TTS Audio
+    // 5. Speech text
     const speechText = finalSpokenText || finalReply;
-    let audioUrl: string | undefined = undefined;
-    try {
-      const tts = await generateSarvamTTS(speechText, session.speaker, finalLangCode, toneHint);
-      if (tts.audioBase64) {
-        const audioId = savePlivoMedia(tts.audioBase64, "audio/wav");
-        audioUrl = `${appUrl}/api/plivo/media?id=${audioId}`;
-      }
-    } catch (ttsErr) {
-      console.warn("[Plivo Action TTS Warning]:", ttsErr);
-    }
+    const plivoLang = finalLangCode === "hi-IN" ? "hi-IN" : "en-IN";
 
     // 6. Check Completion & Webhook Dispatch
     const isFinished = finalIsComplete || finalCallEnded;
@@ -192,9 +178,8 @@ export async function POST(req: NextRequest) {
     // 7. Shape Plivo XML Response
     if (isFinished) {
       const farewellXml = buildFarewellXml({
-        audioUrl,
         farewellText: finalReply,
-        language: finalLangCode,
+        language: plivoLang,
       });
       return new NextResponse(farewellXml, {
         status: 200,
@@ -206,10 +191,11 @@ export async function POST(req: NextRequest) {
     const actionUrl = `${appUrl}/api/plivo/action?callUuid=${encodeURIComponent(callUuid)}&token=${encodeURIComponent(nextToken)}`;
 
     const xml = buildSpeechPromptXml({
-      audioUrl,
-      fallbackText: finalReply,
+      fallbackText: speechText,
       actionUrl,
-      language: finalLangCode,
+      speechEndTimeout: 2,
+      executionTimeout: 15,
+      language: plivoLang,
     });
 
     return new NextResponse(xml, {

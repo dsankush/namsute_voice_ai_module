@@ -29,34 +29,43 @@ function escapeXml(unsafe: string): string {
   });
 }
 
+function getPollyVoice(language: string): string {
+  if (language === "hi-IN") return "Polly.Aditi";
+  if (language.startsWith("en")) return "Polly.Aditi";
+  return "Polly.Aditi";
+}
+
 /**
- * Builds Plivo XML that plays the AI response (via <Play> or <Speak>)
+ * Builds Plivo XML that plays the AI response (via native carrier Polly TTS or <Play>)
  * and captures caller speech via <GetInput inputType="speech">.
  */
 export function buildSpeechPromptXml(params: BuildSpeechPromptXmlParams): string {
   const {
     audioUrl,
-    fallbackText,
+    fallbackText = "Hello! How can I assist you today?",
     actionUrl,
-    speechEndTimeout = 1.2,
-    executionTimeout = 12,
+    speechEndTimeout = 2,
+    executionTimeout = 15,
     language = "en-IN",
   } = params;
 
-  let playbackElement = "";
-  if (audioUrl) {
-    playbackElement = `<Play>${escapeXml(audioUrl)}</Play>`;
-  } else if (fallbackText) {
-    playbackElement = `<Speak language="${escapeXml(language)}">${escapeXml(fallbackText)}</Speak>`;
-  }
+  // Plivo requires speechEndTimeout to be between 2 and 10 seconds
+  const validSpeechEnd = Math.max(2, Math.min(10, speechEndTimeout));
+  const validExec = Math.max(5, Math.min(60, executionTimeout));
+  const voice = getPollyVoice(language);
+
+  // Use native Plivo Polly TTS directly for carrier-grade stability
+  const playbackElement = audioUrl
+    ? `<Play>${escapeXml(audioUrl)}</Play>`
+    : `<Speak voice="${voice}" language="${escapeXml(language)}">${escapeXml(fallbackText)}</Speak>`;
 
   return `<?xml version="1.0" encoding="UTF-8"?>
 <Response>
-  <GetInput action="${escapeXml(actionUrl)}" method="POST" inputType="speech" executionTimeout="${executionTimeout}" speechEndTimeout="${speechEndTimeout}" language="${escapeXml(language)}">
+  <GetInput action="${escapeXml(actionUrl)}" method="POST" inputType="speech" executionTimeout="${validExec}" speechEndTimeout="${validSpeechEnd}" language="${escapeXml(language)}">
     ${playbackElement}
   </GetInput>
-  <Speak language="${escapeXml(language)}">We did not receive any input. Please say that again.</Speak>
-  <GetInput action="${escapeXml(actionUrl)}" method="POST" inputType="speech" executionTimeout="8" speechEndTimeout="${speechEndTimeout}" language="${escapeXml(language)}"/>
+  <Speak voice="${voice}" language="${escapeXml(language)}">I did not hear any response. Could you please say that again?</Speak>
+  <GetInput action="${escapeXml(actionUrl)}" method="POST" inputType="speech" executionTimeout="10" speechEndTimeout="${validSpeechEnd}" language="${escapeXml(language)}"/>
 </Response>`.trim();
 }
 
@@ -70,14 +79,12 @@ export interface BuildFarewellXmlParams {
  * Builds Plivo XML that plays a final farewell/confirmation message and hangs up.
  */
 export function buildFarewellXml(params: BuildFarewellXmlParams): string {
-  const { audioUrl, farewellText = "Thank you for calling. Goodbye!", language = "en-IN" } = params;
+  const { audioUrl, farewellText = "Thank you for calling. Have a great day! Goodbye.", language = "en-IN" } = params;
+  const voice = getPollyVoice(language);
 
-  let playbackElement = "";
-  if (audioUrl) {
-    playbackElement = `<Play>${escapeXml(audioUrl)}</Play>`;
-  } else {
-    playbackElement = `<Speak language="${escapeXml(language)}">${escapeXml(farewellText)}</Speak>`;
-  }
+  const playbackElement = audioUrl
+    ? `<Play>${escapeXml(audioUrl)}</Play>`
+    : `<Speak voice="${voice}" language="${escapeXml(language)}">${escapeXml(farewellText)}</Speak>`;
 
   return `<?xml version="1.0" encoding="UTF-8"?>
 <Response>
@@ -92,7 +99,7 @@ export function buildFarewellXml(params: BuildFarewellXmlParams): string {
 export function buildErrorXml(message = "An error occurred while processing your call. Please call back shortly."): string {
   return `<?xml version="1.0" encoding="UTF-8"?>
 <Response>
-  <Speak language="en-IN">${escapeXml(message)}</Speak>
+  <Speak voice="Polly.Aditi" language="en-IN">${escapeXml(message)}</Speak>
   <Hangup/>
 </Response>`.trim();
 }

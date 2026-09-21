@@ -2,8 +2,6 @@ import { NextRequest, NextResponse } from "next/server";
 import { getPlivoConfig } from "@/lib/plivo/plivoClient";
 import { getOrCreatePlivoSession, encodeStatelessToken } from "@/lib/plivo/plivoSessionStore";
 import { buildSpeechPromptXml, buildErrorXml } from "@/lib/plivo/plivoXmlBuilder";
-import { savePlivoMedia } from "@/lib/plivo/plivoMediaStore";
-import { generateSarvamTTS } from "@/app/api/ai-demo/speech/route";
 import { AUTOMOBILE_TEMPLATES } from "@/automobile/automobileTemplates";
 import { CLINIC_TEMPLATES } from "@/data/clinicTemplates";
 
@@ -65,28 +63,15 @@ async function handleAnswer(req: NextRequest) {
       lastSpokenText: greetingText,
     });
 
-    // Synthesize greeting audio using Sarvam TTS
-    let audioUrl: string | undefined = undefined;
-    try {
-      const ttsResult = await generateSarvamTTS(greetingText, speaker, "en-IN", "greeting");
-      if (ttsResult.audioBase64) {
-        const audioId = savePlivoMedia(ttsResult.audioBase64, "audio/wav");
-        audioUrl = `${appUrl}/api/plivo/media?id=${audioId}`;
-        session.lastAudioId = audioId;
-      }
-    } catch (ttsErr) {
-      console.warn("[Plivo Answer TTS Warning]:", ttsErr);
-    }
-
     const token = encodeStatelessToken(session);
     const actionUrl = `${appUrl}/api/plivo/action?callUuid=${encodeURIComponent(callUuid)}&token=${encodeURIComponent(token)}`;
 
+    // Deliver instant carrier-grade Polly TTS prompt XML without 404 media risks
     const xml = buildSpeechPromptXml({
-      audioUrl,
       fallbackText: greetingText,
       actionUrl,
-      speechEndTimeout: 1.2,
-      executionTimeout: 12,
+      speechEndTimeout: 2,
+      executionTimeout: 15,
       language: "en-IN",
     });
 
